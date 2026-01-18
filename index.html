@@ -254,8 +254,29 @@
         const history = document.getElementById('pneumoHistory').value;
         let list = [];
 
-        // 1. 流感
-        list.push({ name: "流感疫苗", desc: "全民開打中", tag: "季節性" });
+        // ================= 成人邏輯 (修正版：加入 COVID-19) =================
+    function queryAdultVaccines() {
+        const age = parseInt(document.getElementById('adultAge').value);
+        if (isNaN(age)) { alert("請輸入年齡"); return; }
+        const isPreg = document.getElementById('pregnant').checked;
+        const isHighRisk = document.getElementById('highRisk').checked;
+        const isMed = document.getElementById('medicalStaff').checked;
+        const history = document.getElementById('pneumoHistory').value;
+        let list = [];
+
+        // 1. 季節性疫苗 (流感 + COVID-19)
+        list.push({ 
+            name: "流感疫苗 (Influenza)", 
+            desc: "全民開打中。建議每年 10 月後接種。", 
+            tag: "季節性" 
+        });
+        
+        list.push({ 
+            name: "COVID-19 疫苗 (最新變異株)", 
+            desc: "建議接種最新病毒株 (如 JN.1)。可與流感疫苗同時施打 (分開不同部位)。", 
+            tag: "季節性" 
+        });
+
 
         // 2. 帶狀疱疹 (Shingrix) - 重點新增
         if (age >= 50 || (age >= 18 && isHighRisk)) {
@@ -312,5 +333,6 @@
 
 </body>
 </html>
+
 
 

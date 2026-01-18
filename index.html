@@ -11,6 +11,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <style>
+        /* 新增：標題前的 Logo 樣式 */
+        .app-logo {
+            width: 50px;       /* 設定圖片寬度 */
+            height: 50px;      /* 設定圖片高度 */
+            border-radius: 50%;/* 讓圖片變圓形 (像 App icon) */
+            vertical-align: middle; /* 讓圖片跟文字垂直置中 */
+            margin-right: 10px;/* 圖片跟文字的距離 */
+            border: 2px solid white; /* 加個白框更有質感 */
+        }
+        
         :root {
             --primary: #007bff; 
             --secondary: #6c757d;
@@ -76,8 +86,11 @@
 
 <div class="container">
     <div class="header">
-        <h2>🏥 疫苗臨床決策系統 V4</h2>
-        <p>整合 皮蛇(Shingrix) / HPV / 肺炎鏈球菌 / 兒童常規</p>
+        <h2>
+            <img src="icon.png" class="app-logo" alt="logo">
+            疫苗臨床決策系統 V5
+        </h2>
+        <p>整合 皮蛇 / HPV / COVID-19 / 肺炎鏈球菌</p>
     </div>
 
     <div class="tabs">
@@ -299,4 +312,5 @@
 
 </body>
 </html>
+
 

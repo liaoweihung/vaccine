@@ -60,5 +60,243 @@
         .v-title { display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; }
         .badge { font-size: 0.8rem; padding: 4px 8px; border-radius: 12px; color: white; background: var(--secondary); margin-left: 5px;}
         .badge.public { background: var(--danger); }
-        .badge.self { background: var
+        .badge.self { background: var(--purple); }
+        .badge.hpv-public { background: var(--pink); }
+        .badge.upcoming { background: var(--success); }
+        .badge.adult { background: var(--primary); }
+        
+        .v-desc { color: #555; font-size: 0.95rem; line-height: 1.5; }
+        .highlight { color: #d63384; font-weight: bold; }
+        
+        .toggle-container { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 10px; }
+        .toggle-label { font-size: 0.9rem; margin-right: 10px; font-weight: bold; color: var(--purple); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>🏥 疫苗臨床決策系統 V4</h2>
+        <p>整合 皮蛇(Shingrix) / HPV / 肺炎鏈球菌 / 兒童常規</p>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('child')">👶 兒童/青少年</button>
+        <button class="tab-btn" onclick="switchTab('adult')">👴 成人/長者</button>
+    </div>
+
+    <div id="tab-child" class="content-section active">
+        <div class="form-group">
+            <label>兒童出生年月日：</label>
+            <input type="date" id="childBirthdate" onchange="updateChildAge()">
+        </div>
+        
+        <div class="form-group">
+            <label>性別 (影響HPV公費判斷)：</label>
+            <select id="childGender" onchange="if(document.getElementById('childBirthdate').value) queryChildVaccines()">
+                <option value="male">男</option>
+                <option value="female">女</option>
+            </select>
+        </div>
+
+        <div class="toggle-container">
+            <span class="toggle-label">顯示自費建議</span>
+            <input type="checkbox" id="showSelfPaid" checked onchange="if(document.getElementById('childBirthdate').value) queryChildVaccines()">
+        </div>
+
+        <div id="childAgeDisplay" class="info-box">請輸入資料</div>
+        <button class="btn-query" onclick="queryChildVaccines()">查詢時程</button>
+        <div id="childResult" class="result-area"></div>
+    </div>
+
+    <div id="tab-adult" class="content-section">
+        <div class="form-group">
+            <label>年齡 (歲)：</label>
+            <input type="number" id="adultAge" placeholder="例如：55">
+        </div>
+
+        <div class="form-group">
+            <label>特殊身份 / 風險因子：</label>
+            <div class="checkbox-group">
+                <label class="checkbox-item"><input type="checkbox" id="pregnant"> 孕婦</label>
+                <label class="checkbox-item"><input type="checkbox" id="highRisk"> 高風險/免疫低下(含洗腎/癌症/移植)</label>
+                <label class="checkbox-item"><input type="checkbox" id="medicalStaff"> 醫事人員</label>
+            </div>
+        </div>
+
+        <div class="form-group" style="background: #fff8e1; padding: 15px; border-radius: 8px; border: 1px solid #ffeeba;">
+            <label style="color: #856404;">💉 肺炎鏈球菌接種史 (針對65歲+或高風險)：</label>
+            <select id="pneumoHistory">
+                <option value="none">完全未曾接種</option>
+                <option value="ppv23">曾接種過 23價 (PPV23)</option>
+                <option value="pcv13">曾接種過 13價/15價 (PCV13/15)</option>
+                <option value="both">已完成 PCV + PPV 接力</option>
+            </select>
+        </div>
+
+        <button class="btn-query" onclick="queryAdultVaccines()">查詢成人建議</button>
+        <div id="adultResult" class="result-area"></div>
+    </div>
+</div>
+
+<script>
+    // ================= 兒童/青少年資料庫 =================
+    const childSchedule = [
+        { name: "B型肝炎 (HepB-2)", month: 1, range: [1, 2], type: 'public', desc: "公費。滿1個月接種。" },
+        { name: "五合一 + PCV13 (第1劑)", month: 2, range: [2, 3], type: 'public', desc: "公費。滿2個月接種。" },
+        { name: "五合一 + PCV13 (第2劑)", month: 4, range: [4, 5], type: 'public', desc: "公費。滿4個月接種。" },
+        { name: "卡介苗 (BCG)", month: 5, range: [5, 12], type: 'public', desc: "公費。建議5-8個月完成。" },
+        { name: "五合一 + B肝 (第3劑)", month: 6, range: [6, 12], type: 'public', desc: "公費。滿6個月接種。" },
+        { name: "流感疫苗 (初次)", month: 6, range: [6, 999], type: 'public', desc: "公費。滿6個月以上，初次需打2劑。" },
+        { name: "水痘 + MMR + PCV13 (滿歲)", month: 12, range: [12, 18], type: 'public', desc: "公費。滿1歲接種。" },
+        { name: "A型肝炎 (第1劑)", month: 12, range: [12, 60], type: 'public', desc: "公費。滿1歲接種。" },
+        { name: "日本腦炎 (第1劑)", month: 15, range: [15, 24], type: 'public', desc: "公費。滿15個月接種。" },
+        { name: "五合一 (第4劑)", month: 18, range: [18, 30], type: 'public', desc: "公費。滿1歲半接種。" },
+        { name: "A型肝炎 (第2劑)", month: 18, range: [18, 120], type: 'public', desc: "公費。需與第一劑間隔6個月。" },
+        { name: "日本腦炎 (第2劑)", month: 27, range: [27, 48], type: 'public', desc: "公費。滿2歲3個月接種。" },
+        { name: "入學前四合一+MMR+JE", month: 60, range: [60, 84], type: 'public', desc: "公費。滿5歲至入小學前。" },
+        // 自費
+        { name: "輪狀病毒", month: 2, range: [1.5, 8], type: 'self', desc: "💡建議自費。出生15週內開始，8個月內完成。" },
+        { name: "腸病毒 71 型", month: 2, range: [2, 72], type: 'self', desc: "💡建議自費。滿2個月至6歲適用。" },
+        { name: "B型腦膜炎雙球菌", month: 2, range: [2, 600], type: 'self', desc: "建議自費。滿2個月以上即可。" },
+        // HPV
+        { name: "HPV 9價疫苗 (公費)", month: 132, range: [132, 180], type: 'hpv-public', gender: 'female', desc: "💖 公費專案：國中入學女生(約11-13歲)。" },
+        { name: "HPV 9價疫苗 (自費)", month: 108, range: [108, 540], type: 'self', desc: "💡建議自費。9-45歲男女皆適用。" }
+    ];
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+        if (tab === 'child') {
+            document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+            document.getElementById('tab-child').classList.add('active');
+        } else {
+            document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+            document.getElementById('tab-adult').classList.add('active');
+        }
+    }
+
+    let currentChildMonths = 0;
+    function updateChildAge() {
+        const input = document.getElementById('childBirthdate').value;
+        if (!input) return;
+        const dob = new Date(input);
+        const today = new Date();
+        let years = today.getFullYear() - dob.getFullYear();
+        let months = today.getMonth() - dob.getMonth();
+        if (months < 0) { years--; months += 12; }
+        currentChildMonths = (years * 12) + months;
+        document.getElementById('childAgeDisplay').innerHTML = `目前年齡：${years}歲${months}個月 (總月齡: ${currentChildMonths}m)`;
+    }
+
+    function queryChildVaccines() {
+        if (!document.getElementById('childBirthdate').value) { alert("請輸入出生日期"); return; }
+        const showSelf = document.getElementById('showSelfPaid').checked;
+        const gender = document.getElementById('childGender').value;
+        const resDiv = document.getElementById('childResult');
+        let html = "";
+        
+        let due = [];
+        let upcoming = [];
+
+        childSchedule.forEach(v => {
+            if (v.type === 'self' && !showSelf) return; 
+            if (v.name.includes("輪狀") && currentChildMonths > 8) return;
+            if (v.type === 'hpv-public' && gender !== 'female') return; 
+            if (v.name.includes("HPV") && v.type === 'self' && gender === 'female' && currentChildMonths >= 132 && currentChildMonths <= 180) return;
+
+            if (currentChildMonths >= v.month) {
+                if ((currentChildMonths - v.month < 24) || v.month >= 60 || (v.type==='self' && currentChildMonths < v.range[1]) || v.type === 'hpv-public') {
+                    if (currentChildMonths <= v.range[1]) due.push(v);
+                }
+            } else if (v.month > currentChildMonths && v.month <= currentChildMonths + 12) {
+                upcoming.push(v);
+            }
+        });
+
+        due.sort((a,b) => a.month - b.month);
+
+        if (due.length > 0) {
+            html += `<h3>🚨 本次就醫建議</h3>`;
+            due.forEach(v => {
+                let badgeClass = 'public'; let cardClass = 'status-due'; let badgeText = '公費應打';
+                if (v.type === 'self') { badgeClass = 'self'; cardClass = 'status-self'; badgeText = '自費建議'; } 
+                else if (v.type === 'hpv-public') { badgeClass = 'hpv-public'; cardClass = 'status-hpv'; badgeText = '公費(專案)'; }
+                
+                html += renderCard(v.name, v.desc, badgeText, badgeClass, cardClass);
+            });
+        } else {
+            html += `<div style="text-align:center; padding:20px; color:#28a745;">✅ 目前無建議項目</div>`;
+        }
+        resDiv.innerHTML = html;
+    }
+
+    // ================= 成人邏輯 (新增 Shingrix) =================
+    function queryAdultVaccines() {
+        const age = parseInt(document.getElementById('adultAge').value);
+        if (isNaN(age)) { alert("請輸入年齡"); return; }
+        const isPreg = document.getElementById('pregnant').checked;
+        const isHighRisk = document.getElementById('highRisk').checked;
+        const isMed = document.getElementById('medicalStaff').checked;
+        const history = document.getElementById('pneumoHistory').value;
+        let list = [];
+
+        // 1. 流感
+        list.push({ name: "流感疫苗", desc: "全民開打中", tag: "季節性" });
+
+        // 2. 帶狀疱疹 (Shingrix) - 重點新增
+        if (age >= 50 || (age >= 18 && isHighRisk)) {
+            list.push({ 
+                name: "帶狀疱疹疫苗 (Shingrix)", 
+                desc: "💡<strong>強烈建議(自費)。</strong>非活性基因重組疫苗，保護力>90%。需施打2劑 (間隔2-6個月)。", 
+                tag: "自費" 
+            });
+        }
+
+        // 3. HPV
+        if (age >= 18 && age <= 45) {
+            list.push({ name: "HPV 9價疫苗", desc: "建議自費。男女皆適用。", tag: "自費" });
+        }
+
+        // 4. 肺炎鏈球菌 (公費)
+        if (age >= 65 || (age >= 19 && isHighRisk)) {
+            let advice = "";
+            let eligible = false;
+            if (history === 'none') { advice = "建議接種 1 劑 <span class='highlight'>PCV20 或 PCV21</span>。"; eligible = true; }
+            else if (history === 'ppv23') { advice = "曾打過PPV23：需間隔至少1年，接種 PCV20/21。"; eligible = true; }
+            else if (history === 'pcv13') { advice = "曾打過PCV13/15：需間隔至少1年，接種 PCV20/21。"; eligible = true; }
+            if (eligible) list.push({ name: "肺炎鏈球菌 (PCV20/21)", desc: `公費資格(新制)：${advice}`, tag: "公費建議" });
+        }
+
+        // 5. Tdap / MMR
+        if (isPreg) list.push({ name: "Tdap (破傷風/百日咳)", desc: "懷孕28-36週接種1劑。", tag: "孕婦專用" });
+        if (isMed) list.push({ name: "MMR / B肝 / 流感", desc: "確認抗體狀況，不足建議補種。", tag: "醫事人員" });
+
+        const resDiv = document.getElementById('adultResult');
+        let html = "<h3>🔎 查詢結果</h3>";
+        list.forEach(v => {
+            // 判斷樣式: 自費紫色, 公費藍色/紅色
+            let cardClass = v.tag === '自費' ? 'status-self' : 'status-adult-rec';
+            let badgeClass = v.tag === '自費' ? 'self' : 'adult';
+            
+            html += renderCard(v.name, v.desc, v.tag, badgeClass, cardClass);
+        });
+        resDiv.innerHTML = html;
+    }
+
+    function renderCard(title, desc, badgeText, badgeClass, cardClass) {
+        return `
+            <div class="vaccine-card ${cardClass}">
+                <div class="v-title">
+                    ${title}
+                    <span class="badge ${badgeClass}">${badgeText}</span>
+                </div>
+                <div class="v-desc">${desc}</div>
+            </div>
+        `;
+    }
+</script>
+
+</body>
+</html>
 
